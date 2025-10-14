@@ -11,18 +11,25 @@ permissions:
 jobs:
   tag:
     runs-on: ubuntu-latest
+
     steps:
-      - name: Checkout code
+      - name: Checkout code with all history and tags
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0  # Fetch full history and tags
+          fetch-depth: 0
+          fetch-tags: true
 
-      - name: Get latest tag and bump version
-        id: bump_tag
+      - name: Verify existing tags
         run: |
-          # Get latest tag (if none, use v0.0.0)
+          echo "📦 Existing tags in repo:"
+          git fetch --tags
+          git tag --list || true
+
+      - name: Get latest tag
+        id: get_tag
+        run: |
           latest_tag=$(git describe --tags --abbrev=0 2>/dev/null || echo "v0.0.0")
-          echo "Latest tag: $latest_tag"
+          echo "Latest tag found: $latest_tag"
           echo "latest_tag=$latest_tag" >> "$GITHUB_OUTPUT"
 
       - name: Bump version and create tag
@@ -30,20 +37,30 @@ jobs:
           LATEST_TAG: ${{ steps.get_tag.outputs.latest_tag }}
         run: |
           echo "Latest tag value is: $LATEST_TAG"
-          # Remove the 'v' prefix, then split version
+
+          # Remove 'v' prefix and split into parts
           version="${LATEST_TAG#v}"
           IFS='.' read -r major minor patch <<< "$version"
 
-          # Handle first run when no previous tag exists
+          # Handle empty or malformed tags
           if [ -z "$major" ] || [ -z "$minor" ] || [ -z "$patch" ]; then
             major=0
             minor=0
             patch=0
           fi
 
-          # Bump patch version
-          new_tag="v$major.$minor.$((patch + 1))"
-          echo "Creating new tag: $new_tag"
+          # Loop until we find a new tag that doesn’t exist
+          while true; do
+            new_tag="v$major.$minor.$((patch + 1))"
+            if git rev-parse "$new_tag" >/dev/null 2>&1; then
+              echo "⚠️  Tag $new_tag already exists, trying next..."
+              patch=$((patch + 1))
+            else
+              break
+            fi
+          done
+
+          echo "✅ Creating new tag: $new_tag"
 
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
@@ -51,5 +68,7 @@ jobs:
           git tag "$new_tag"
           git push origin "$new_tag"
 
+          echo "new_tag=$new_tag" >> "$GITHUB_OUTPUT"
+
       - name: Print success message
-        run: echo "✅ Successfully created and pushed tag!"
+        run: echo "🎉 Successfully created and pushed new tag!"
