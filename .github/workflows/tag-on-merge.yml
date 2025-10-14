@@ -5,12 +5,17 @@ on:
     branches:
       - main
 
+permissions:
+  contents: write
+
 jobs:
   tag:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
+        with:
+          fetch-depth: 0  # Important to fetch existing tags!
 
       - name: Get latest tag
         id: get_tag
@@ -20,10 +25,15 @@ jobs:
           echo "latest_tag=$latest_tag" >> $GITHUB_OUTPUT
 
       - name: Bump version and create tag
+        env:
+          LATEST_TAG: ${{ steps.get_tag.outputs.latest_tag }}
         run: |
-          IFS='.' read -r major minor patch <<< "${{ steps.get_tag.outputs.latest_tag#v }}"
+          IFS='.' read -r major minor patch <<< "${LATEST_TAG#v}"
           new_tag="v$major.$minor.$((patch+1))"
-          git config user.name "github-actions"
-          git config user.email "github-actions@github.com"
+          echo "Creating new tag: $new_tag"
+
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
           git tag $new_tag
           git push origin $new_tag
