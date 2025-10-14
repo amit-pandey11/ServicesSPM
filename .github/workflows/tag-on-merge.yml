@@ -76,6 +76,8 @@ jobs:
       - name: Trigger Host App workflow
         if: success()
         run: |
+          new_tag=$(git describe --tags --abbrev=0)
+          echo "Triggering host repo for version: $new_tag"
           curl -X POST \
             -H "Accept: application/vnd.github+json" \
             -H "Authorization: Bearer ${{ secrets.HOST_APP_TOKEN }}" \
