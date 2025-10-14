@@ -72,3 +72,12 @@ jobs:
 
       - name: Print success message
         run: echo "🎉 Successfully created and pushed new tag!"
+
+      - name: Trigger Host App workflow
+        if: success()
+        run: |
+          curl -X POST \
+            -H "Accept: application/vnd.github+json" \
+            -H "Authorization: Bearer ${{ secrets.HOST_REPO_TOKEN }}" \
+            https://api.github.com/repos/amit-pandey11/HostApp/dispatches \
+            -d '{"event_type": "spm_version_updated", "client_payload": {"new_tag": "${{ steps.get_tag.outputs.new_tag }}"}}'
