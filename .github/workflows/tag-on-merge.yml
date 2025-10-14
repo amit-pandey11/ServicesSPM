@@ -5,25 +5,51 @@ on:
     branches:
       - main
 
+permissions:
+  contents: write
+
 jobs:
   tag:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Fetch full history and tags
 
-      - name: Get latest tag
-        id: get_tag
+      - name: Get latest tag and bump version
+        id: bump_tag
         run: |
+          # Get latest tag (if none, use v0.0.0)
           latest_tag=$(git describe --tags --abbrev=0 2>/dev/null || echo "v0.0.0")
           echo "Latest tag: $latest_tag"
-          echo "latest_tag=$latest_tag" >> $GITHUB_OUTPUT
+          echo "latest_tag=$latest_tag" >> "$GITHUB_OUTPUT"
 
       - name: Bump version and create tag
+        env:
+          LATEST_TAG: ${{ steps.get_tag.outputs.latest_tag }}
         run: |
-          IFS='.' read -r major minor patch <<< "${{ steps.get_tag.outputs.latest_tag#v }}"
-          new_tag="v$major.$minor.$((patch+1))"
-          git config user.name "github-actions"
-          git config user.email "github-actions@github.com"
-          git tag $new_tag
-          git push origin $new_tag
+          echo "Latest tag value is: $LATEST_TAG"
+          # Remove the 'v' prefix, then split version
+          version="${LATEST_TAG#v}"
+          IFS='.' read -r major minor patch <<< "$version"
+
+          # Handle first run when no previous tag exists
+          if [ -z "$major" ] || [ -z "$minor" ] || [ -z "$patch" ]; then
+            major=0
+            minor=0
+            patch=0
+          fi
+
+          # Bump patch version
+          new_tag="v$major.$minor.$((patch + 1))"
+          echo "Creating new tag: $new_tag"
+
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+          git tag "$new_tag"
+          git push origin "$new_tag"
+
+      - name: Print success message
+        run: echo "✅ Successfully created and pushed tag!"
