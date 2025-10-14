@@ -17,12 +17,11 @@ jobs:
         with:
           fetch-depth: 0  # Important to fetch existing tags!
 
-      - name: Get latest tag
-        id: get_tag
+      - name: Get latest tag and bump version
+        id: bump_tag
         run: |
           latest_tag=$(git describe --tags --abbrev=0 2>/dev/null || echo "v0.0.0")
           echo "Latest tag: $latest_tag"
-          echo "latest_tag=$latest_tag" >> $GITHUB_OUTPUT
 
       - name: Bump version and create tag
         env:
